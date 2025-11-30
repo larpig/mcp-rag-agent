@@ -1,0 +1,64 @@
+#,question,reference,source,generated_answer,agent_error,timestamp
+1,"In the UK, how many days of annual leave do employees receive?",25 days per year.,3 - Annual Leave.txt,"UK employees receive 25 days of paid annual leave per year.
+
+Reference:
+1. 3 - Annual Leave.txt
+
+Let me know if you need more details or have other questions.",,2025-11-30T08:26:08.109992
+2,Can unused annual leave be carried over for EU employees?,"Yes, up to 5 days can be carried over.",3 - Annual Leave.txt,"Yes, for EU employees, up to 5 days of unused annual leave can be carried over.
+
+Reference:
+1. 3 - Annual Leave.txt
+
+Let me know if you need more details or have other questions.",,2025-11-30T08:26:11.256602
+3,How often should employees change their passwords?,Every 90 days.,4 - IT Security.txt,"Employees must change their passwords every 90 days.
+
+Reference:
+1. 4 - IT Security.txt
+
+Let me know if you need more details or have other questions.",,2025-11-30T08:26:14.223668
+4,Can I claim for lunch expenses when working in the office?,"No, only when working away from the home office.",2 – Expenses.txt,"You cannot claim lunch expenses when working in the office. Meal costs are reimbursable only when working away from the home office.
+
+Reference:
+1. 2 - Expenses.txt
+
+Let me know if you need more details or have other questions.",,2025-11-30T08:26:16.572124
+5,"In the US, how far in advance should I request annual leave?",At least one week in advance.,3 - Annual Leave.txt,"In the US, you should submit your annual leave request at least one week in advance.
+
+Reference:
+1. 3 - Annual Leave.txt
+
+Let me know if you need more details or have other questions.",,2025-11-30T08:26:18.645503
+6,What should I do if I suspect a security incident?,Report it to IT immediately.,4 - IT Security.txt,"If you suspect a security incident, you should:
+
+- Immediately report the incident to the IT Security team using the designated incident reporting channel.
+- Do not attempt to investigate or resolve the incident on your own.
+- Preserve any evidence related to the incident (e.g., emails, files, screenshots).
+- Follow any additional instructions provided by the IT Security team.
+
+Reference:
+1. Information Security Policy
+
+Let me know if you need more details or specific reporting procedures.",,2025-11-30T08:26:22.068918
+7,How many remote days can I work each week?,Up to three days per week.,1 - Remote Working.txt,"You may work remotely up to three days per week. All remote work must be agreed in advance with your line manager.
+
+Reference:
+1. 1 - Remote Working.txt
+
+Let me know if you need more details or have other questions.",,2025-11-30T08:26:24.803267
+8,Who must approve remote work?,Your line manager.,1 - Remote Working.txt,"Remote work must be approved by the employee’s direct manager. Reference:
+1. Remote Work Policy
+
+Let me know if you need more details or have other questions.",,2025-11-30T08:26:25.650701
+9,What’s the company’s carbon reduction target?,Reduce emissions by 20% by 2030.,5 – Sustainability.txt,"The company’s carbon reduction target is to reduce carbon emissions by 20% by 2030.
+
+Reference:
+1. 5 - Sustainability.txt
+
+Let me know if you need more details or have other questions.",,2025-11-30T08:26:28.093178
+10,What’s the rule on sharing company laptops?,They must not be shared with anyone outside the organisation.,4 - IT Security.txt,"- Company laptops must not be shared with anyone outside the organisation.
+
+Reference:
+1. 4 - IT Security.txt
+
+Let me know if you need more details or have other questions.",,2025-11-30T08:26:30.005265

@@ -1,0 +1,3 @@
+Passwords must be at least 12 characters long and changed every 90 days.
+Company laptops must not be shared with anyone outside the organisation.
+All security incidents must be reported to IT immediately.

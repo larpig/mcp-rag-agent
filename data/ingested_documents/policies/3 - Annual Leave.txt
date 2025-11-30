@@ -1,0 +1,17 @@
+UK Employees:
+
+Full-time employees receive 25 days of paid annual leave per year.
+Leave requests should be submitted at least two weeks in advance.
+Unused leave cannot be carried over except in exceptional circumstances.
+
+EU Employees:
+
+Full-time employees receive 30 days of paid annual leave per year.
+Leave requests should be submitted at least four weeks in advance.
+Up to 5 days unused leave can be carried over.
+
+US Employees:
+
+Full-time employees receive 15 days of paid annual leave per year.
+Leave requests should be submitted at least one week in advance.
+Unused leave cannot be carried over.

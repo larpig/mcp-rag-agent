@@ -1,0 +1,11 @@
+langchain==1.1.0
+langchain-core==1.1.0
+langchain-mcp-adapters==0.1.14
+langchain-openai==1.1.0
+#langgraph==1.0.4
+langsmith==0.4.49
+mcp>=1.2.0
+pymongo>=4.6.0
+openai>=1.0.0
+python-dotenv>=1.0.0
+pydantic-settings>=2.10.1
