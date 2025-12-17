@@ -253,7 +253,8 @@ class MongoDBClient:
         query_vector: list[float],
         limit: int = 10,
         num_candidates: int = 100,
-        filter_query: Optional[dict[str, Any]] = None
+        filter_query: Optional[dict[str, Any]] = None,
+        min_score: Optional[float] = None
     ) -> list[dict[str, Any]]:
         """Perform vector similarity search.
         
@@ -265,6 +266,10 @@ class MongoDBClient:
             limit: Maximum number of results to return.
             num_candidates: Number of candidates to consider.
             filter_query: Optional filter to apply to results.
+            min_score: Optional minimum similarity score threshold (0-1 for cosine).
+                Only documents with score >= min_score are returned.
+                Example: 0.7 for high relevance, 0.5 for moderate relevance.
+                Default: None (no filtering).
             
         Returns:
             List of matching documents with similarity scores.
@@ -291,7 +296,13 @@ class MongoDBClient:
         if filter_query:
             pipeline[0]["$vectorSearch"]["filter"] = filter_query
         
-        return list(collection.aggregate(pipeline))
+        results = list(collection.aggregate(pipeline))
+        
+        # Apply score threshold filtering if specified
+        if min_score is not None:
+            results = [doc for doc in results if doc.get("score", 0) >= min_score]
+        
+        return results
     
     def text_search(
         self,
@@ -300,7 +311,8 @@ class MongoDBClient:
         query_text: str,
         limit: int = 10,
         filter_query: Optional[dict[str, Any]] = None,
-        use_atlas_search: bool = False
+        use_atlas_search: bool = False,
+        min_score: Optional[float] = None
     ) -> list[dict[str, Any]]:
         """Perform full-text search using MongoDB text index or Atlas Search.
         
@@ -318,6 +330,12 @@ class MongoDBClient:
                 Example: {"department": "HR", "status": "active"}
             use_atlas_search: If True, uses Atlas Search ($search operator).
                 If False, uses standard text index ($text operator). Default: False.
+            min_score: Optional minimum text relevance score threshold.
+                Only documents with text_score >= min_score are returned.
+                Note: Score ranges vary between standard ($text) and Atlas Search.
+                Standard text search: typically 0.5-3.0 for relevant matches.
+                Atlas Search: typically 1.0-10.0+ for relevant matches.
+                Default: None (no filtering).
         
         Returns:
             List of documents sorted by text relevance score (highest first).
@@ -382,7 +400,13 @@ class MongoDBClient:
             if filter_query:
                 pipeline.insert(1, {"$match": filter_query})
             
-            return list(collection.aggregate(pipeline))
+            results = list(collection.aggregate(pipeline))
+            
+            # Apply score threshold filtering if specified
+            if min_score is not None:
+                results = [doc for doc in results if doc.get("text_score", 0) >= min_score]
+            
+            return results
         else:
             # Use standard MongoDB text search ($text operator)
             query = {"$text": {"$search": query_text}}
@@ -401,7 +425,13 @@ class MongoDBClient:
                 {"$limit": limit}
             ]
             
-            return list(collection.aggregate(pipeline))
+            results = list(collection.aggregate(pipeline))
+            
+            # Apply score threshold filtering if specified
+            if min_score is not None:
+                results = [doc for doc in results if doc.get("text_score", 0) >= min_score]
+            
+            return results
     
     def hybrid_search(
         self,
@@ -416,7 +446,10 @@ class MongoDBClient:
         vector_weight: float = 0.7,
         text_weight: float = 0.3,
         filter_query: Optional[dict[str, Any]] = None,
-        rrf_k: int = 60
+        rrf_k: int = 60,
+        min_vector_score: Optional[float] = None,
+        min_text_score: Optional[float] = None,
+        min_rrf_score: Optional[float] = None
     ) -> list[dict[str, Any]]:
         """Perform hybrid search combining vector similarity and full-text search.
         
@@ -451,6 +484,15 @@ class MongoDBClient:
                 Example: {"department": "HR", "status": "active"}
             rrf_k: RRF constant (default: 60). Lower values give more weight to
                 top-ranked results. Typical values: 1-100.
+            min_vector_score: Optional minimum vector similarity score threshold.
+                Filters vector results BEFORE RRF fusion. Example: 0.6 for moderate relevance.
+                Default: None (no filtering).
+            min_text_score: Optional minimum text relevance score threshold.
+                Filters text results BEFORE RRF fusion. Example: 1.0 for standard text search.
+                Default: None (no filtering).
+            min_rrf_score: Optional minimum RRF score threshold for final results.
+                Filters combined results AFTER RRF fusion. Example: 0.01 for quality threshold.
+                Default: None (no filtering).
         
         Returns:
             List of documents sorted by combined RRF score (highest first).
@@ -503,7 +545,7 @@ class MongoDBClient:
             - RRF Paper: https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf
             - Used by: Elasticsearch, Weaviate, Vespa, and other search engines
         """
-        # 1. Perform vector search using vector_search method
+        # 1. Perform vector search using vector_search method with threshold
         vector_results = self.vector_search(
             collection_name=collection_name,
             index_name=vector_index_name,
@@ -511,16 +553,18 @@ class MongoDBClient:
             query_vector=query_vector,
             limit=limit * 2,  # Get more candidates for fusion
             num_candidates=num_candidates,
-            filter_query=filter_query
+            filter_query=filter_query,
+            min_score=min_vector_score  # Apply vector score threshold
         )
         
-        # 2. Perform text search using text_search method
+        # 2. Perform text search using text_search method with threshold
         text_results = self.text_search(
             collection_name=collection_name,
             index_name=text_index_name,
             query_text=query_text,
             limit=limit * 2,  # Get more candidates for fusion
-            filter_query=filter_query
+            filter_query=filter_query,
+            min_score=min_text_score  # Apply text score threshold
         )
         
         # 3. Apply Reciprocal Rank Fusion (RRF)
@@ -568,9 +612,13 @@ class MongoDBClient:
             reverse=True
         )
         
-        # 5. Build final result documents
+        # 5. Build final result documents with optional RRF score filtering
         final_results = []
         for item in sorted_results[:limit]:
+            # Apply RRF score threshold if specified
+            if min_rrf_score is not None and item["rrf_score"] < min_rrf_score:
+                continue
+            
             doc = item["document"]
             doc["rrf_score"] = item["rrf_score"]
             doc["vector_rank"] = item["vector_rank"]

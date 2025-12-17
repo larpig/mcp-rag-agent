@@ -334,6 +334,266 @@ results = await hybrid.search(
 
 ---
 
+## Score Thresholds
+
+### Overview
+
+All search methods support optional score thresholds to filter out low-quality results automatically. Thresholds help improve precision by excluding irrelevant documents.
+
+### Vector Search Thresholds
+
+**Score Range:** 0-1 (for cosine similarity)
+
+```python
+# High relevance only
+results = await hybrid.vector_search(
+    query="artificial intelligence applications",
+    min_score=0.75  # Only very similar documents
+)
+
+# Moderate relevance
+results = await hybrid.vector_search(
+    query="machine learning concepts",
+    min_score=0.6  # Accept moderately similar documents
+)
+
+# Exploratory search
+results = await hybrid.vector_search(
+    query="technology trends",
+    min_score=0.5  # Broader search
+)
+```
+
+**Recommended Thresholds:**
+- **0.8-1.0**: Extremely high relevance (very strict)
+- **0.7-0.8**: High relevance (recommended for precision)
+- **0.6-0.7**: Moderate relevance (balanced)
+- **0.5-0.6**: Lower relevance (exploration)
+- **< 0.5**: Likely not relevant
+
+### Text Search Thresholds
+
+**Score Range:** Varies by implementation
+- Standard MongoDB text search: typically 0.5-3.0
+- Atlas Search: typically 1.0-10.0+
+
+```python
+# Standard text search with threshold
+results = client.text_search(
+    collection_name="documents",
+    index_name="text_idx",
+    query_text="remote work policy",
+    min_score=1.5,  # Filter weak matches
+    use_atlas_search=False
+)
+
+# Atlas Search with threshold
+results = client.text_search(
+    collection_name="documents",
+    index_name="atlas_text_idx",
+    query_text="remote work policy",
+    min_score=3.0,  # Higher threshold for Atlas
+    use_atlas_search=True
+)
+```
+
+**Recommended Thresholds:**
+
+**Standard Text Search ($text):**
+- **2.0+**: High relevance (multiple term matches)
+- **1.0-2.0**: Moderate relevance (good matches)
+- **0.5-1.0**: Lower relevance (weaker matches)
+
+**Atlas Search:**
+- **5.0+**: High relevance
+- **2.0-5.0**: Moderate relevance
+- **1.0-2.0**: Lower relevance
+
+### Hybrid Search Thresholds
+
+Hybrid search supports **three-tier filtering** for maximum control:
+
+1. **Pre-RRF Filtering**: Filter individual search results before fusion
+2. **RRF Fusion**: Combine remaining results using RRF algorithm
+3. **Post-RRF Filtering**: Final quality gate on combined scores
+
+```python
+# Strict quality control
+results = await hybrid.search(
+    query="machine learning best practices",
+    min_vector_score=0.7,   # High semantic similarity required
+    min_text_score=1.5,     # Strong keyword match required
+    min_rrf_score=0.015,    # High combined quality threshold
+    limit=10
+)
+
+# Balanced approach (recommended)
+results = await hybrid.search(
+    query="data science techniques",
+    min_vector_score=0.6,   # Moderate semantic similarity
+    min_text_score=1.0,     # Reasonable keyword match
+    min_rrf_score=0.01,     # Standard quality gate
+    limit=10
+)
+
+# Lenient exploration
+results = await hybrid.search(
+    query="emerging technologies",
+    min_vector_score=0.5,   # Accept broader matches
+    min_text_score=None,    # No text filtering
+    min_rrf_score=None,     # No final filtering
+    limit=20
+)
+
+# Semantic-focused with text boost
+results = await hybrid.search(
+    query="innovative AI solutions",
+    min_vector_score=0.65,  # Moderate semantic requirement
+    min_text_score=None,    # Accept any text match
+    min_rrf_score=0.008,    # Light final filter
+    vector_weight=0.8,      # Emphasize semantic
+    text_weight=0.2,
+    limit=10
+)
+```
+
+**Recommended RRF Thresholds:**
+- **0.02+**: Very high quality (strict)
+- **0.015-0.02**: High quality (recommended for precision)
+- **0.01-0.015**: Standard quality (balanced)
+- **0.005-0.01**: Lenient quality (more recall)
+- **< 0.005**: Very lenient (exploration)
+
+### Threshold Strategy by Use Case
+
+#### Compliance / Legal Search
+**Goal:** High precision, no false positives
+```python
+results = await hybrid.search(
+    query="GDPR Article 17 right to erasure",
+    min_vector_score=0.75,  # High semantic match
+    min_text_score=2.0,     # Strong keyword presence
+    min_rrf_score=0.02,     # Very high quality gate
+    vector_weight=0.5,      # Equal weight
+    text_weight=0.5
+)
+```
+
+#### General Q&A / RAG System
+**Goal:** Balanced precision and recall
+```python
+results = await hybrid.search(
+    query="What is the remote working policy?",
+    min_vector_score=0.6,   # Moderate semantic
+    min_text_score=1.0,     # Reasonable keywords
+    min_rrf_score=0.01,     # Standard quality
+    vector_weight=0.7,      # Favor semantic
+    text_weight=0.3
+)
+```
+
+#### Exploratory Research
+**Goal:** Maximum recall, discover related content
+```python
+results = await hybrid.search(
+    query="sustainability initiatives",
+    min_vector_score=0.5,   # Broad semantic
+    min_text_score=None,    # No text filter
+    min_rrf_score=0.005,    # Light quality gate
+    vector_weight=0.8,      # Heavy semantic weight
+    text_weight=0.2,
+    limit=20
+)
+```
+
+#### Technical Documentation Search
+**Goal:** Exact terms with context
+```python
+results = await hybrid.search(
+    query="API authentication methods",
+    min_vector_score=0.65,  # Moderate semantic
+    min_text_score=1.5,     # Good keyword match
+    min_rrf_score=0.012,    # Above average quality
+    vector_weight=0.6,      # Slight semantic preference
+    text_weight=0.4
+)
+```
+
+### Dynamic Threshold Adjustment
+
+Adjust thresholds based on result counts:
+
+```python
+async def adaptive_search(query: str, target_results: int = 10):
+    """Adaptive search that adjusts thresholds based on results."""
+    
+    # Start with strict thresholds
+    results = await hybrid.search(
+        query=query,
+        min_vector_score=0.75,
+        min_text_score=2.0,
+        min_rrf_score=0.015,
+        limit=target_results * 2
+    )
+    
+    # If too few results, relax thresholds
+    if len(results) < target_results:
+        results = await hybrid.search(
+            query=query,
+            min_vector_score=0.6,
+            min_text_score=1.0,
+            min_rrf_score=0.01,
+            limit=target_results * 2
+        )
+    
+    # If still too few, remove thresholds
+    if len(results) < target_results:
+        results = await hybrid.search(
+            query=query,
+            min_vector_score=None,
+            min_text_score=None,
+            min_rrf_score=None,
+            limit=target_results
+        )
+    
+    return results[:target_results]
+```
+
+### Monitoring and Tuning
+
+Track threshold effectiveness:
+
+```python
+def analyze_threshold_impact(query: str):
+    """Analyze how thresholds affect results."""
+    
+    # Search without thresholds
+    all_results = await hybrid.search(query, limit=20)
+    
+    # Search with thresholds
+    filtered_results = await hybrid.search(
+        query,
+        min_vector_score=0.7,
+        min_text_score=1.5,
+        min_rrf_score=0.01,
+        limit=20
+    )
+    
+    print(f"Without thresholds: {len(all_results)} results")
+    print(f"With thresholds: {len(filtered_results)} results")
+    print(f"Filtered out: {len(all_results) - len(filtered_results)} documents")
+    
+    # Show score distribution
+    if all_results:
+        vector_scores = [r.get('vector_score', 0) for r in all_results if r.get('vector_score')]
+        text_scores = [r.get('text_score', 0) for r in all_results if r.get('text_score')]
+        rrf_scores = [r.get('rrf_score', 0) for r in all_results]
+        
+        print(f"\nVector scores: min={min(vector_scores):.3f}, max={max(vector_scores):.3f}")
+        print(f"Text scores: min={min(text_scores):.3f}, max={max(text_scores):.3f}")
+        print(f"RRF scores: min={min(rrf_scores):.3f}, max={max(rrf_scores):.3f}")
+```
+
 ## Best Practices
 
 ### 1. Choose the Right Search Method
@@ -349,7 +609,24 @@ results = client.text_search("specific-product-code-XYZ-123")
 results = await hybrid_search.search("general question about anything")
 ```
 
-### 2. Create Proper Indexes
+### 2. Use Thresholds Appropriately
+
+```python
+# Start with moderate thresholds
+results = await hybrid.search(
+    query="your query",
+    min_vector_score=0.6,
+    min_text_score=1.0,
+    min_rrf_score=0.01
+)
+
+# Adjust based on:
+# - Result count (too few? lower thresholds)
+# - Result quality (too many irrelevant? raise thresholds)
+# - Use case requirements (precision vs recall)
+```
+
+### 3. Create Proper Indexes
 
 ```python
 # For hybrid search, create BOTH indexes
@@ -363,7 +640,7 @@ hybrid.setup_indexes(
 )
 ```
 
-### 3. Optimize Text Queries
+### 4. Optimize Text Queries
 
 ```python
 # ❌ BAD: Too many stop words
@@ -376,7 +653,7 @@ query = "machine learning best practices"
 query = "machine learning model optimization techniques"
 ```
 
-### 4. Monitor and Adjust
+### 5. Monitor and Adjust
 
 ```python
 # Log search results for analysis
@@ -392,7 +669,7 @@ if text_matches_are_better:
     vector_weight = 0.5  # Decrease from 0.7
 ```
 
-### 5. Handle Edge Cases
+### 6. Handle Edge Cases
 
 ```python
 # Empty results from text search (no keyword matches)
@@ -407,7 +684,7 @@ document = {
 }
 ```
 
-### 6. Language Considerations
+### 7. Language Considerations
 
 ```python
 # MongoDB text search supports multiple languages

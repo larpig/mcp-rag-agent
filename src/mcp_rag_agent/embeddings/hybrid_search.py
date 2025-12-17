@@ -108,7 +108,10 @@ class HybridSearch:
         vector_weight: float = 0.7,
         text_weight: float = 0.3,
         filter_query: Optional[dict[str, Any]] = None,
-        rrf_k: int = 60
+        rrf_k: int = 60,
+        min_vector_score: Optional[float] = None,
+        min_text_score: Optional[float] = None,
+        min_rrf_score: Optional[float] = None
     ) -> list[dict[str, Any]]:
         """Perform hybrid search combining vector and text search.
         
@@ -122,6 +125,12 @@ class HybridSearch:
             text_weight: Weight for text search results (default: 0.3).
             filter_query: Optional filter to apply.
             rrf_k: RRF constant (default: 60).
+            min_vector_score: Minimum vector similarity score threshold.
+                Filters vector results before RRF. Example: 0.6 for moderate relevance.
+            min_text_score: Minimum text relevance score threshold.
+                Filters text results before RRF. Example: 1.0 for standard text search.
+            min_rrf_score: Minimum RRF score threshold for final results.
+                Filters combined results after RRF. Example: 0.01 for quality threshold.
             
         Returns:
             List of matching documents with RRF scores and rankings.
@@ -133,7 +142,7 @@ class HybridSearch:
         # Generate embedding for the query
         query_vector = await self._embedding_generator.generate(query)
         
-        # Perform hybrid search
+        # Perform hybrid search with thresholds
         results = self._mongo_client.hybrid_search(
             collection_name=collection,
             vector_index_name=vector_index,
@@ -145,7 +154,10 @@ class HybridSearch:
             vector_weight=vector_weight,
             text_weight=text_weight,
             filter_query=filter_query,
-            rrf_k=rrf_k
+            rrf_k=rrf_k,
+            min_vector_score=min_vector_score,
+            min_text_score=min_text_score,
+            min_rrf_score=min_rrf_score
         )
         
         # Format results (remove embedding from response)
@@ -163,7 +175,8 @@ class HybridSearch:
         limit: int = 10,
         collection_name: Optional[str] = None,
         index_name: Optional[str] = None,
-        filter_query: Optional[dict[str, Any]] = None
+        filter_query: Optional[dict[str, Any]] = None,
+        min_score: Optional[float] = None
     ) -> list[dict[str, Any]]:
         """Perform vector-only semantic search.
         
@@ -173,6 +186,8 @@ class HybridSearch:
             collection_name: Collection to search.
             index_name: Vector search index name.
             filter_query: Optional filter to apply.
+            min_score: Minimum similarity score threshold (0-1 for cosine).
+                Only documents with score >= min_score are returned.
             
         Returns:
             List of matching documents with scores.
@@ -183,14 +198,15 @@ class HybridSearch:
         # Generate embedding for the query
         query_vector = await self._embedding_generator.generate(query)
         
-        # Perform vector search
+        # Perform vector search with threshold
         results = self._mongo_client.vector_search(
             collection_name=collection,
             index_name=index,
             vector_field=self._vector_field,
             query_vector=query_vector,
             limit=limit,
-            filter_query=filter_query
+            filter_query=filter_query,
+            min_score=min_score
         )
         
         # Format results
@@ -208,7 +224,8 @@ class HybridSearch:
         limit: int = 10,
         collection_name: Optional[str] = None,
         index_name: Optional[str] = None,
-        filter_query: Optional[dict[str, Any]] = None
+        filter_query: Optional[dict[str, Any]] = None,
+        min_score: Optional[float] = None
     ) -> list[dict[str, Any]]:
         """Perform text-only keyword search.
         
@@ -218,6 +235,8 @@ class HybridSearch:
             collection_name: Collection to search.
             index_name: Text search index name.
             filter_query: Optional filter to apply.
+            min_score: Minimum text relevance score threshold.
+                Only documents with text_score >= min_score are returned.
             
         Returns:
             List of matching documents with text scores.
@@ -225,14 +244,15 @@ class HybridSearch:
         collection = collection_name or self._default_collection
         index = index_name or self._default_text_index
         
-        # Perform text search (use standard text index by default)
+        # Perform text search with threshold (use standard text index by default)
         results = self._mongo_client.text_search(
             collection_name=collection,
             index_name=index,
             query_text=query,
             limit=limit,
             filter_query=filter_query,
-            use_atlas_search=False
+            use_atlas_search=False,
+            min_score=min_score
         )
         
         # Format results

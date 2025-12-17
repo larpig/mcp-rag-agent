@@ -306,7 +306,7 @@ client.create_vector_search_index(
 
 ##### `vector_search()`
 
-Performs vector similarity search.
+Performs vector similarity search with optional score threshold filtering.
 
 ```python
 results = client.vector_search(
@@ -316,7 +316,8 @@ results = client.vector_search(
     query_vector=[0.12, -0.34, 0.56, ...],  # 1536 dimensions
     limit=5,
     num_candidates=100,
-    filter_query={"department": "HR"}
+    filter_query={"department": "HR"},
+    min_score=0.7  # Only return high-quality matches
 )
 ```
 
@@ -328,6 +329,7 @@ results = client.vector_search(
 - `limit` (int, optional): Maximum results (default: 10)
 - `num_candidates` (int, optional): Number of candidates to consider (default: 100)
 - `filter_query` (dict, optional): Additional filter to apply to results
+- `min_score` (float, optional): Minimum similarity score threshold (0-1 for cosine). Only documents with score >= min_score are returned. Default: None (no filtering)
 
 **Returns:**
 - List of documents with similarity scores
@@ -351,18 +353,37 @@ results = client.vector_search(
 2. Returns top-k most similar documents
 3. Includes similarity score in results
 4. Optionally filters results based on metadata
+5. Applies score threshold if specified
+
+**Score Threshold Examples:**
+```python
+# High relevance only (recommended for precision)
+results = client.vector_search(..., min_score=0.75)
+
+# Moderate relevance (balanced)
+results = client.vector_search(..., min_score=0.6)
+
+# Exploratory search (broader results)
+results = client.vector_search(..., min_score=0.5)
+```
+
+**Recommended Thresholds:**
+- **0.7-0.8**: High relevance (strict filtering)
+- **0.6-0.7**: Moderate relevance (balanced)
+- **0.5-0.6**: Lower relevance (exploratory)
+- **None**: No filtering (all results)
 
 #### Hybrid Search Operations
 
 ##### `hybrid_search()`
 
-Performs hybrid search combining vector similarity and full-text search using Reciprocal Rank Fusion (RRF).
+Performs hybrid search combining vector similarity and full-text search using Reciprocal Rank Fusion (RRF) with optional three-tier threshold filtering.
 
 ```python
 # Generate query embedding
 query_vector = await embedder.generate_embedding("remote work policy")
 
-# Perform hybrid search
+# Perform hybrid search with quality thresholds
 results = client.hybrid_search(
     collection_name="documents",
     vector_index_name="vector_idx",
@@ -375,7 +396,10 @@ results = client.hybrid_search(
     vector_weight=0.7,
     text_weight=0.3,
     filter_query={"department": "HR"},
-    rrf_k=60
+    rrf_k=60,
+    min_vector_score=0.6,   # Filter vector results before RRF
+    min_text_score=1.0,     # Filter text results before RRF
+    min_rrf_score=0.01      # Filter final combined results
 )
 ```
 
@@ -392,6 +416,9 @@ results = client.hybrid_search(
 - `text_weight` (float, optional): Weight for text results (default: 0.3)
 - `filter_query` (dict, optional): Metadata filter
 - `rrf_k` (int, optional): RRF constant (default: 60)
+- `min_vector_score` (float, optional): Minimum vector similarity threshold. Filters vector results BEFORE RRF fusion. Default: None
+- `min_text_score` (float, optional): Minimum text relevance threshold. Filters text results BEFORE RRF fusion. Default: None
+- `min_rrf_score` (float, optional): Minimum RRF score threshold. Filters combined results AFTER RRF fusion. Default: None
 
 **Returns:**
 - List of documents with combined RRF scores and ranking information
@@ -413,19 +440,66 @@ results = client.hybrid_search(
 ]
 ```
 
+**Three-Tier Threshold Filtering:**
+
+Hybrid search supports sophisticated quality control with three independent thresholds:
+
+1. **Pre-RRF Filtering** (`min_vector_score`, `min_text_score`):
+   - Filters individual search results BEFORE combining them
+   - Removes low-quality matches early
+   - Example: Filter out vector scores < 0.6 and text scores < 1.0
+
+2. **RRF Fusion**:
+   - Combines remaining results using RRF algorithm
+   - Deduplicates documents found by both searches
+
+3. **Post-RRF Filtering** (`min_rrf_score`):
+   - Final quality gate on combined RRF scores
+   - Ensures only high-quality combined results are returned
+   - Example: Only return results with RRF score >= 0.01
+
+**Threshold Examples:**
+```python
+# Strict quality control (high precision)
+results = client.hybrid_search(
+    ...,
+    min_vector_score=0.75,  # High semantic similarity
+    min_text_score=2.0,     # Strong keyword match
+    min_rrf_score=0.015     # High combined quality
+)
+
+# Balanced approach (recommended)
+results = client.hybrid_search(
+    ...,
+    min_vector_score=0.6,   # Moderate semantic
+    min_text_score=1.0,     # Reasonable keywords
+    min_rrf_score=0.01      # Standard quality gate
+)
+
+# Exploratory search (broad results)
+results = client.hybrid_search(
+    ...,
+    min_vector_score=0.5,   # Accept broader matches
+    min_text_score=None,    # No text filtering
+    min_rrf_score=None      # No final filtering
+)
+```
+
 **How RRF Works:**
 
 Reciprocal Rank Fusion (RRF) is an industry-standard algorithm that combines rankings from multiple search systems:
 
 1. **Execute Both Searches**: Runs vector and text search in parallel
-2. **Assign Ranks**: Documents are ranked by their position (1, 2, 3, ...)
-3. **Calculate RRF Scores**: For each document:
+2. **Apply Pre-RRF Thresholds**: Filters each result set independently
+3. **Assign Ranks**: Documents are ranked by their position (1, 2, 3, ...)
+4. **Calculate RRF Scores**: For each document:
    ```
    RRF_score = (vector_weight / (k + vector_rank)) + (text_weight / (k + text_rank))
    ```
    where k=60 (default) reduces impact of high ranks
-4. **Deduplicate**: Documents in both result sets have combined scores
-5. **Rank by Score**: Final results sorted by RRF score (highest first)
+5. **Deduplicate**: Documents in both result sets have combined scores
+6. **Apply Post-RRF Threshold**: Filters final results by combined score
+7. **Rank by Score**: Final results sorted by RRF score (highest first)
 
 **Why RRF?**
 - **Robust**: No score normalization needed (combines ranks, not scores)
@@ -446,6 +520,11 @@ Reciprocal Rank Fusion (RRF) is an industry-standard algorithm that combines ran
 - Adjust `rrf_k` (1-100): lower values favor top results
 - Ensure query_text and query_vector represent same query
 - Create both indexes before first search
+- Start with moderate thresholds (0.6, 1.0, 0.01) and adjust based on results
+- Use strict thresholds for compliance/legal searches
+- Use lenient thresholds for exploratory research
+
+> **📚 For detailed threshold strategies, use cases, and tuning guidelines, see [SEARCH_GUIDE.md](./SEARCH_GUIDE.md#score-thresholds)**
 
 ## Configuration
 
