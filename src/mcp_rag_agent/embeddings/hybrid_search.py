@@ -445,6 +445,75 @@ async def main():
             print(f"\n{idx}. Text Score: {result.get('text_score', 'N/A'):.4f}")
             print(f"   Content: {result.get('content', 'N/A')[:100]}...")
         
+        # Demonstrate threshold filtering
+        print("\n" + "="*60)
+        print("HYBRID SEARCH WITH THRESHOLDS (Quality Filtering)")
+        print("="*60)
+        print(f"Query: '{query}'")
+        print("Applying thresholds:")
+        print("  - min_vector_score=0.6 (moderate semantic similarity)")
+        print("  - min_text_score=1.0 (reasonable keyword match)")
+        print("  - min_rrf_score=0.01 (standard quality gate)")
+        
+        # First get all results without thresholds for comparison
+        all_results = await hybrid_search.search(
+            query=query,
+            limit=10,  # Get more results to show filtering effect
+            collection_name=config.db_vector_collection,
+            vector_index_name="vector_index",
+            text_index_name="text_index",
+            semantic_weight=0.7
+        )
+        
+        # Then apply thresholds
+        threshold_results = await hybrid_search.search(
+            query=query,
+            limit=10,  # Same limit for fair comparison
+            collection_name=config.db_vector_collection,
+            vector_index_name="vector_index",
+            text_index_name="text_index",
+            semantic_weight=0.7,
+            min_vector_score=0.5,   # Filter vector results
+            min_text_score=1.2,     # Filter text results
+            min_rrf_score=0.01      # Filter final RRF results
+        )
+        
+        print(f"\nAfter applying thresholds, found {len(threshold_results)} results:")
+        for idx, result in enumerate(threshold_results, 1):
+            print(f"\n{idx}. RRF Score: {result.get('rrf_score', 'N/A'):.4f}")
+            print(f"   Vector Rank: {result.get('vector_rank', 'N/A')}, Text Rank: {result.get('text_rank', 'N/A')}")
+            if result.get('vector_score'):
+                print(f"   Vector Score: {result.get('vector_score', 'N/A'):.4f} (threshold: 0.6)")
+            if result.get('text_score'):
+                print(f"   Text Score: {result.get('text_score', 'N/A'):.4f} (threshold: 1.0)")
+            print(f"   Content: {result.get('content', 'N/A')[:100]}...")
+            
+            # Highlight which thresholds were passed
+            passed_thresholds = []
+            if result.get('vector_score', 0) >= 0.6:
+                passed_thresholds.append("vector✓")
+            if result.get('text_score', 0) >= 1.0:
+                passed_thresholds.append("text✓")
+            if result.get('rrf_score', 0) >= 0.01:
+                passed_thresholds.append("rrf✓")
+            print(f"   Passed: {', '.join(passed_thresholds) if passed_thresholds else 'none'}")
+        
+        # Show comparison summary
+        print("\n" + "="*60)
+        print("RESULTS SUMMARY")
+        print("="*60)
+        print(f"Hybrid search (limit=3, no thresholds):       {len(results)} results")
+        print(f"Hybrid search (limit=10, no thresholds):      {len(all_results)} results")
+        print(f"Hybrid search (limit=10, with thresholds):    {len(threshold_results)} results")
+        print(f"Filtered out by thresholds:                   {len(all_results) - len(threshold_results)} documents")
+        
+        if len(threshold_results) < len(all_results):
+            print("\n✓ Threshold filtering improved precision by removing low-quality matches!")
+        elif len(threshold_results) == len(all_results):
+            print("\n✓ All results passed the quality thresholds!")
+        else:
+            print("\n⚠ Note: Different limits used - increase limit to see filtering effect")
+        
         # Delete the dummy documents
         print("\n" + "="*60)
         print("Cleaning up dummy documents...")
