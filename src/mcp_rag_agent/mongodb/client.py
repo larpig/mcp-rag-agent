@@ -443,8 +443,7 @@ class MongoDBClient:
         query_text: str,
         limit: int = 10,
         num_candidates: int = 100,
-        vector_weight: float = 0.7,
-        text_weight: float = 0.3,
+        semantic_weight: float = 0.7,
         filter_query: Optional[dict[str, Any]] = None,
         rrf_k: int = 60,
         min_vector_score: Optional[float] = None,
@@ -476,10 +475,13 @@ class MongoDBClient:
             limit: Maximum number of final results to return (default: 10).
             num_candidates: Number of candidates for vector search (default: 100).
                 Higher values improve recall but reduce performance.
-            vector_weight: Weight for vector search results (default: 0.7).
-                Should sum with text_weight to 1.0 for balanced scoring.
-            text_weight: Weight for text search results (default: 0.3).
-                Should sum with vector_weight to 1.0 for balanced scoring.
+            semantic_weight: Weight controlling semantic vs keyword search (0-1, default: 0.7).
+                - 1.0 = Pure semantic search (vector only)
+                - 0.7 = Semantic-focused (recommended default)
+                - 0.5 = Balanced hybrid search
+                - 0.3 = Keyword-focused
+                - 0.0 = Pure keyword search (text only)
+                The text weight is automatically calculated as (1 - semantic_weight).
             filter_query: Optional MongoDB query filter to apply to both searches.
                 Example: {"department": "HR", "status": "active"}
             rrf_k: RRF constant (default: 60). Lower values give more weight to
@@ -516,7 +518,7 @@ class MongoDBClient:
             >>> # Generate query embedding
             >>> query_vec = embedder.generate_embedding("remote work policy")
             >>> 
-            >>> # Perform hybrid search
+            >>> # Perform hybrid search (semantic-focused)
             >>> results = client.hybrid_search(
             ...     collection_name="documents",
             ...     vector_index_name="vec_idx",
@@ -525,8 +527,7 @@ class MongoDBClient:
             ...     query_vector=query_vec,
             ...     query_text="remote work policy",
             ...     limit=5,
-            ...     vector_weight=0.7,
-            ...     text_weight=0.3
+            ...     semantic_weight=0.7  # Semantic-focused (0.7 semantic, 0.3 keyword)
             ... )
             >>> 
             >>> for doc in results:
@@ -545,6 +546,10 @@ class MongoDBClient:
             - RRF Paper: https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf
             - Used by: Elasticsearch, Weaviate, Vespa, and other search engines
         """
+        # Calculate vector and text weights from semantic_weight parameter
+        vector_weight = semantic_weight
+        text_weight = 1.0 - semantic_weight
+        
         # 1. Perform vector search using vector_search method with threshold
         vector_results = self.vector_search(
             collection_name=collection_name,

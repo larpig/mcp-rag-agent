@@ -105,8 +105,7 @@ class HybridSearch:
         collection_name: Optional[str] = None,
         vector_index_name: Optional[str] = None,
         text_index_name: Optional[str] = None,
-        vector_weight: float = 0.7,
-        text_weight: float = 0.3,
+        semantic_weight: float = 0.7,
         filter_query: Optional[dict[str, Any]] = None,
         rrf_k: int = 60,
         min_vector_score: Optional[float] = None,
@@ -121,8 +120,12 @@ class HybridSearch:
             collection_name: Collection to search.
             vector_index_name: Vector search index name.
             text_index_name: Text search index name.
-            vector_weight: Weight for vector search results (default: 0.7).
-            text_weight: Weight for text search results (default: 0.3).
+            semantic_weight: Weight controlling semantic vs keyword search (0-1, default: 0.7).
+                - 1.0 = Pure semantic search (vector only)
+                - 0.7 = Semantic-focused (recommended default)
+                - 0.5 = Balanced hybrid search
+                - 0.3 = Keyword-focused
+                - 0.0 = Pure keyword search (text only)
             filter_query: Optional filter to apply.
             rrf_k: RRF constant (default: 60).
             min_vector_score: Minimum vector similarity score threshold.
@@ -151,8 +154,7 @@ class HybridSearch:
             query_vector=query_vector,
             query_text=query,
             limit=limit,
-            vector_weight=vector_weight,
-            text_weight=text_weight,
+            semantic_weight=semantic_weight,
             filter_query=filter_query,
             rrf_k=rrf_k,
             min_vector_score=min_vector_score,
@@ -399,8 +401,7 @@ async def main():
             collection_name=config.db_vector_collection,
             vector_index_name="vector_index",
             text_index_name="text_index",
-            vector_weight=0.7,
-            text_weight=0.3
+            semantic_weight=0.7  # Semantic-focused (0.7 semantic, 0.3 keyword)
         )
         
         print(f"\nFound {len(results)} results:")

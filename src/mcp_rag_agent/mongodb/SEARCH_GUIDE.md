@@ -198,8 +198,9 @@ Hybrid search **combines vector and text search** using Reciprocal Rank Fusion (
        k = 60 (default constant, reduces high-rank impact)
        vector_rank = position in vector results (1, 2, 3, ...)
        text_rank = position in text results (1, 2, 3, ...)
-       vector_weight = 0.7 (default, adjustable)
-       text_weight = 0.3 (default, adjustable)
+       semantic_weight = 0.7 (default, adjustable 0-1)
+       vector_weight = semantic_weight
+       text_weight = 1.0 - semantic_weight
    ```
 
 3. **Score Combination**:
@@ -228,9 +229,8 @@ hybrid = HybridSearch(
 results = await hybrid.search(
     query="What is machine learning and AI?",
     limit=5,
-    vector_weight=0.7,  # Favor semantic similarity
-    text_weight=0.3,    # Boost keyword matches
-    rrf_k=60           # Standard RRF constant
+    semantic_weight=0.7,  # 0.7 semantic, 0.3 keyword (default)
+    rrf_k=60              # Standard RRF constant
 )
 
 # Each result includes:
@@ -258,7 +258,7 @@ Rank 1: "Machine learning is a subset of AI..." (score: 2.45)
 Rank 2: "AI and machine learning applications..." (score: 2.20)
 ```
 
-**Step 3: RRF Calculation** (k=60, vector_weight=0.7, text_weight=0.3)
+**Step 3: RRF Calculation** (k=60, semantic_weight=0.7 → vector_weight=0.7, text_weight=0.3)
 
 | Document | Vector Rank | Text Rank | RRF Calculation | Final Score |
 |----------|-------------|-----------|-----------------|-------------|
@@ -273,30 +273,39 @@ Rank 2: "AI and machine learning applications..." (score: 2.20)
 3. "Python for data science..." (RRF: 0.0111) - Found in vector only
 ```
 
-### Tuning Weights
+### Tuning Semantic Weight
 
-Adjust `vector_weight` and `text_weight` based on your use case:
+Adjust `semantic_weight` (0-1) to control the balance between semantic and keyword search:
 
 ```python
-# Favor semantic similarity (exploratory search)
+# Pure semantic search (exploratory, conceptual)
 results = await hybrid.search(
     query="innovative AI solutions",
-    vector_weight=0.8,  # Higher weight on concepts
-    text_weight=0.2     # Lower weight on keywords
+    semantic_weight=1.0  # 100% semantic (vector only)
 )
 
-# Favor exact keywords (precise search)
+# Semantic-focused (recommended default)
+results = await hybrid.search(
+    query="machine learning applications",
+    semantic_weight=0.7  # 70% semantic, 30% keyword
+)
+
+# Balanced hybrid search
 results = await hybrid.search(
     query="Python API documentation",
-    vector_weight=0.5,  # Equal weight
-    text_weight=0.5
+    semantic_weight=0.5  # 50% semantic, 50% keyword
 )
 
-# Strong keyword preference (legal/compliance)
+# Keyword-focused (precision search)
 results = await hybrid.search(
-    query="GDPR Article 17 data erasure",
-    vector_weight=0.3,  # Lower semantic weight
-    text_weight=0.7     # Higher keyword weight
+    query="GDPR Article 17 compliance",
+    semantic_weight=0.3  # 30% semantic, 70% keyword
+)
+
+# Pure keyword search (exact terms only)
+results = await hybrid.search(
+    query="specific-product-code-XYZ",
+    semantic_weight=0.0  # 0% semantic (text only)
 )
 ```
 
@@ -451,8 +460,7 @@ results = await hybrid.search(
     min_vector_score=0.65,  # Moderate semantic requirement
     min_text_score=None,    # Accept any text match
     min_rrf_score=0.008,    # Light final filter
-    vector_weight=0.8,      # Emphasize semantic
-    text_weight=0.2,
+    semantic_weight=0.8,    # Emphasize semantic (0.8 semantic, 0.2 keyword)
     limit=10
 )
 ```
@@ -474,8 +482,7 @@ results = await hybrid.search(
     min_vector_score=0.75,  # High semantic match
     min_text_score=2.0,     # Strong keyword presence
     min_rrf_score=0.02,     # Very high quality gate
-    vector_weight=0.5,      # Equal weight
-    text_weight=0.5
+    semantic_weight=0.5     # Balanced (50% semantic, 50% keyword)
 )
 ```
 
@@ -487,8 +494,7 @@ results = await hybrid.search(
     min_vector_score=0.6,   # Moderate semantic
     min_text_score=1.0,     # Reasonable keywords
     min_rrf_score=0.01,     # Standard quality
-    vector_weight=0.7,      # Favor semantic
-    text_weight=0.3
+    semantic_weight=0.7     # Semantic-focused (default)
 )
 ```
 
@@ -500,8 +506,7 @@ results = await hybrid.search(
     min_vector_score=0.5,   # Broad semantic
     min_text_score=None,    # No text filter
     min_rrf_score=0.005,    # Light quality gate
-    vector_weight=0.8,      # Heavy semantic weight
-    text_weight=0.2,
+    semantic_weight=0.8,    # Heavy semantic emphasis
     limit=20
 )
 ```
@@ -514,8 +519,7 @@ results = await hybrid.search(
     min_vector_score=0.65,  # Moderate semantic
     min_text_score=1.5,     # Good keyword match
     min_rrf_score=0.012,    # Above average quality
-    vector_weight=0.6,      # Slight semantic preference
-    text_weight=0.4
+    semantic_weight=0.6     # Slight semantic preference
 )
 ```
 
@@ -663,10 +667,11 @@ for i, doc in enumerate(results, 1):
     logger.info(f"Rank {i}: RRF={doc['rrf_score']:.4f}, "
                 f"Vector={doc['vector_rank']}, Text={doc['text_rank']}")
     
-# Adjust weights based on which component performs better
+# Adjust semantic_weight based on which component performs better
 if text_matches_are_better:
-    text_weight = 0.5  # Increase from 0.3
-    vector_weight = 0.5  # Decrease from 0.7
+    semantic_weight = 0.5  # More balanced (decrease from 0.7)
+elif vector_matches_are_better:
+    semantic_weight = 0.8  # More semantic (increase from 0.7)
 ```
 
 ### 6. Handle Edge Cases

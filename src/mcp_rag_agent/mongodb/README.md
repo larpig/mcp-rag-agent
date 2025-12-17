@@ -412,8 +412,7 @@ results = client.hybrid_search(
 - `query_text` (str): Text query string
 - `limit` (int, optional): Maximum results (default: 10)
 - `num_candidates` (int, optional): Candidates for vector search (default: 100)
-- `vector_weight` (float, optional): Weight for vector results (default: 0.7)
-- `text_weight` (float, optional): Weight for text results (default: 0.3)
+- `semantic_weight` (float, optional): Weight controlling semantic vs keyword search (0-1, default: 0.7). Higher values favor semantic similarity, lower values favor keyword matching
 - `filter_query` (dict, optional): Metadata filter
 - `rrf_k` (int, optional): RRF constant (default: 60)
 - `min_vector_score` (float, optional): Minimum vector similarity threshold. Filters vector results BEFORE RRF fusion. Default: None
@@ -495,8 +494,13 @@ Reciprocal Rank Fusion (RRF) is an industry-standard algorithm that combines ran
 4. **Calculate RRF Scores**: For each document:
    ```
    RRF_score = (vector_weight / (k + vector_rank)) + (text_weight / (k + text_rank))
+   
+   where:
+       semantic_weight = 0.7 (default, adjustable 0-1)
+       vector_weight = semantic_weight
+       text_weight = 1.0 - semantic_weight
+       k = 60 (default, reduces impact of high ranks)
    ```
-   where k=60 (default) reduces impact of high ranks
 5. **Deduplicate**: Documents in both result sets have combined scores
 6. **Apply Post-RRF Threshold**: Filters final results by combined score
 7. **Rank by Score**: Final results sorted by RRF score (highest first)
@@ -514,9 +518,11 @@ Reciprocal Rank Fusion (RRF) is an industry-standard algorithm that combines ran
 - **Improved Recall**: Finds relevant documents missed by single approach
 
 **Best Practices:**
-- Use 0.7/0.3 weights for semantic-heavy queries
-- Use 0.5/0.5 weights for balanced importance
-- Use 0.3/0.7 weights for keyword-heavy queries
+- Use `semantic_weight=0.7` (default) for semantic-heavy queries
+- Use `semantic_weight=0.5` for balanced importance
+- Use `semantic_weight=0.3` for keyword-heavy queries
+- Use `semantic_weight=1.0` for pure semantic search (vector only)
+- Use `semantic_weight=0.0` for pure keyword search (text only)
 - Adjust `rrf_k` (1-100): lower values favor top results
 - Ensure query_text and query_vector represent same query
 - Create both indexes before first search
@@ -729,8 +735,7 @@ results = client.hybrid_search(
     query_vector=query_vector,
     query_text=query_text,
     limit=5,
-    vector_weight=0.7,  # Emphasize semantic similarity
-    text_weight=0.3,    # Include keyword matching
+    semantic_weight=0.7,  # 70% semantic, 30% keyword (default)
     filter_query={"department": "HR"}  # Optional filter
 )
 
