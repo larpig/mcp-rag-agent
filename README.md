@@ -1,11 +1,11 @@
 # MCP RAG Agent
 
-Production-ready RAG system combining LangGraph agent with Model Context Protocol (MCP) integration. Features semantic search via MongoDB Atlas Vector Search, grounded responses using COSTAR prompting, and automated RAGAS-based evaluation for building reliable, context-aware AI agents.
+Production-ready RAG system combining LangGraph agent with Model Context Protocol (MCP) integration. Features hybrid search using Reciprocal Rank Fusion (RRF) via MongoDB vector and full-ttext searches, grounded responses using COSTAR prompting, and automated RAGAS-based evaluation for building reliable, context-aware AI agents.
 
 ## Overview
 
 The MCP RAG Agent is a sophisticated question-answering system that:
-- Uses semantic search to find relevant documents from a policy corpus
+- Uses hybrid search to find relevant documents from a policy corpus
 - Employs a LangGraph agent to reason about and retrieve information
 - Integrates via the Model Context Protocol (MCP) for modular, reusable components
 - Ensures grounded responses using the COSTAR prompting framework
